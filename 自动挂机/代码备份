@@ -1,0 +1,280 @@
+import tkinter as tk
+import pyautogui
+import random
+import time
+import win32gui
+import win32con
+import threading
+
+def start_clicking():
+    global running
+    running = True
+    while running:
+        pyautogui.click(341, 96)
+        time.sleep(random.randint(1, 10))
+        pyautogui.click(592, 96)
+        time.sleep(random.randint(1, 10))
+
+def stop_clicking():
+    global running, thread
+    running = False
+    if thread.is_alive():  # 判断置顶线程是否还在运行
+        thread.join()  # 等待置顶线程结束，确保线程资源正确释放
+    # 重置相关状态，以便下次点击开始能正常运行
+    running = False
+    # 可以在这里添加更多重置操作，比如清除一些临时变量等，根据实际需求来定
+
+def set_window_on_top():
+    hwnd = win32gui.FindWindow(None, "鼠标自动点击控制")
+    if hwnd:
+        for _ in range(5):  # 尝试5次
+            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+            time.sleep(0.2)  # 每次尝试间隔0.2秒
+
+def keep_window_on_top():
+    while running:
+        set_window_on_top()
+        time.sleep(1)  # 每隔1秒重新置顶一次
+
+def start_thread():
+    global thread, keep_top_thread
+    if not running:  # 只有当程序不在运行时才启动新线程
+        thread = threading.Thread(target=start_clicking)
+        keep_top_thread = threading.Thread(target=keep_window_on_top)
+        thread.start()
+        keep_top_thread.start()
+
+root = tk.Tk()
+root.title("鼠标自动点击控制")
+root.geometry("800x200")
+running = False
+thread = None  # 初始化线程对象为None
+keep_top_thread = None  # 初始化保持置顶的线程对象为None
+
+# 程序启动时将窗口置顶
+set_window_on_top()
+
+start_button = tk.Button(root, text="开始", command=start_thread)
+start_button.pack()
+stop_button = tk.Button(root, text="停止", command=stop_clicking)
+stop_button.pack()
+
+bottom_text = "正在挂机操作，请点击停止后！再动鼠标"
+text_label = tk.Label(root, text=bottom_text, font=("Arial", 16))
+text_label.pack(side = tk.BOTTOM)
+
+root.mainloop()
+
+这个代码我想改一下pyautogui.click(341, 96)
+        time.sleep(random.randint(1, 10))
+        pyautogui.click(592, 96)
+        time.sleep(random.randint(1, 10))这里的随机时间的10秒改成可以手动输入默认10秒，xy的左边也设置成可以手动输入的。
+在窗口中增加一个可以添加点位的选项默认两个，点击加号可以增加一个xy左边，每一个xy坐标都可以手动输入的。其他的不变，怎么改？
+
+
+
+2025年1月14日
+import sys
+import subprocess
+import random
+import time
+import threading
+import os
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QWidget, QMessageBox, QFileDialog
+from PyQt5.QtCore import Qt
+import pyautogui
+from PyQt5.QtGui import QFont
+
+
+class ClickThread(threading.Thread):
+    def __init__(self, positions, interval):
+        super().__init__()
+        self.positions = positions
+        self.interval = interval
+        self.running = False
+
+    def run(self):
+        self.running = True
+        while self.running:
+            for x, y in self.positions:
+                pyautogui.click(x, y)
+                time.sleep(random.randint(1, self.interval))
+
+    def stop(self):
+        self.running = False
+        if self.is_alive():
+            self.join()
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("授权保持工具")
+        self.setGeometry(500, 500, 600, 500)
+        self.click_thread = None
+        self.positions = []
+        self.init_ui()
+
+    def init_ui(self):
+        self.main_layout = QVBoxLayout()
+        self.main_widget = QWidget()
+        self.main_widget.setLayout(self.main_layout)
+        self.setCentralWidget(self.main_widget)
+
+        # 提示文字
+        self.bottom_text = QLabel("正在挂机操作，请点击停止后！再动鼠标")
+        font = QFont()
+        font.setPointSize(14)  # 设置字体大小为 14 号
+        font.setBold(True)  # 设置字体为粗体
+        self.bottom_text.setFont(font)  # 应用字体设置
+        self.bottom_text.setAlignment(Qt.AlignCenter)
+        self.main_layout.addWidget(self.bottom_text)
+
+        # 按钮和位置采集区域
+        self.button_and_collect_layout = QVBoxLayout()
+        self.main_layout.addLayout(self.button_and_collect_layout)
+
+        # 位置输入区域
+        self.input_layout = QVBoxLayout()
+        self.button_and_collect_layout.addLayout(self.input_layout)
+
+        # 按钮区域
+        self.button_layout = QHBoxLayout()
+        self.button_and_collect_layout.addLayout(self.button_layout)
+        self.start_button = QPushButton("开始")
+        self.start_button.clicked.connect(self.start_clicking)
+        self.button_layout.addWidget(self.start_button)
+        self.stop_button = QPushButton("停止")
+        self.stop_button.clicked.connect(self.stop_clicking)
+        self.button_layout.addWidget(self.stop_button)
+        self.add_button = QPushButton("增加一个点位")
+        self.add_button.clicked.connect(self.add_position)
+        self.button_layout.addWidget(self.add_button)
+
+        # 添加“位置采集”按钮
+        self.collect_button = QPushButton("位置采集")
+        self.collect_button.clicked.connect(self.collect_positions)
+        self.button_layout.addWidget(self.collect_button)
+
+        # 间隔时间输入
+        self.interval_layout = QHBoxLayout()
+        self.main_layout.addLayout(self.interval_layout)
+
+        # 添加左侧伸缩空间
+        self.interval_layout.addStretch()
+
+        self.interval_label = QLabel("随机时间：")
+        self.interval_layout.addWidget(self.interval_label)
+
+        self.entry_interval = QLineEdit()
+        self.entry_interval.setPlaceholderText("默认10")
+        self.entry_interval.setText("10")
+        self.entry_interval.setFixedWidth(100)  # 设置固定宽度
+        self.interval_layout.addWidget(self.entry_interval)
+
+        self.seconds_label = QLabel("秒")
+        self.interval_layout.addWidget(self.seconds_label)
+
+        # 添加右侧伸缩空间
+        self.interval_layout.addStretch()
+
+    def add_position(self, x=None, y=None, index=None):
+        if index is None or index >= len(self.positions):
+            index = len(self.positions)
+        position_layout = QHBoxLayout()
+        self.input_layout.insertLayout(index, position_layout)
+        x_label = QLabel("X：")
+        position_layout.addWidget(x_label)
+        entry_x = QLineEdit()
+        entry_x.setPlaceholderText("X坐标")
+        if x is not None:
+            entry_x.setText(str(x))
+        position_layout.addWidget(entry_x)
+        y_label = QLabel("Y：")
+        position_layout.addWidget(y_label)
+        entry_y = QLineEdit()
+        entry_y.setPlaceholderText("Y坐标")
+        if y is not None:
+            entry_y.setText(str(y))
+        position_layout.addWidget(entry_y)
+        self.positions.insert(index, (entry_x, entry_y))
+        self.adjustSize()  # 调整窗口大小
+
+    def start_clicking(self):
+        if self.click_thread and self.click_thread.is_alive():
+            QMessageBox.warning(self, "警告", "点击线程已经在运行！")
+            return
+
+        positions = []
+        for entry_x, entry_y in self.positions:
+            try:
+                x = int(entry_x.text())
+                y = int(entry_y.text())
+                positions.append((x, y))
+            except ValueError:
+                QMessageBox.warning(self, "警告", "请输入有效的坐标值！")
+                return
+
+        try:
+            interval = int(self.entry_interval.text())
+        except ValueError:
+            QMessageBox.warning(self, "警告", "请输入有效的间隔时间！")
+            return
+
+        self.click_thread = ClickThread(positions, interval)
+        self.click_thread.start()
+
+    def stop_clicking(self):
+        if self.click_thread:
+            self.click_thread.stop()
+            self.click_thread = None
+
+    def collect_positions(self):
+        try:
+            # 获取当前文件的目录
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # 构造 collector.py 的路径
+            collector_path = os.path.join(current_dir, 'collector.py')
+            # 构造 collected_positions.txt 的路径
+            collected_positions_path = os.path.join(current_dir, 'collected_positions.txt')
+
+            # 启动采集工具
+            subprocess.run([sys.executable, collector_path], check=True)
+            # 读取采集结果
+            with open(collected_positions_path, "r") as file:
+                lines = file.readlines()
+                for line in lines:
+                    parts = line.split(", ")
+                    x = int(parts[0].split("=")[1])
+                    y = int(parts[1].split("=")[1])
+                    if len(self.positions) < 2:
+                        self.add_position(x, y)
+                    else:
+                        self.add_position(x, y, index=1)
+            # 清空采集结果文件
+            with open(collected_positions_path, "w") as file:
+                file.truncate()
+        except FileNotFoundError:
+            QMessageBox.warning(self, "错误", "采集文件未找到，请检查！")
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"采集过程中出现错误：{str(e)}")
+
+    def closeEvent(self, event):
+        # 获取当前文件的目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # 构造 collected_positions.txt 的路径
+        collected_positions_path = os.path.join(current_dir, 'collected_positions.txt')
+        # 删除 collected_positions.txt 文件
+        try:
+            os.remove(collected_positions_path)
+        except FileNotFoundError:
+            pass
+        event.accept()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    sys.exit(app.exec_())
