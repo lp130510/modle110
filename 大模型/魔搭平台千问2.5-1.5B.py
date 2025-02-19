@@ -75,6 +75,6 @@ async def generate_text(request: GenerateRequest):
 if __name__ == "__main__":
     try:
         logging.info("正在启动 FastAPI 服务...")
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        uvicorn.run(app, host="0.0.0.0", port=8012)
     except Exception as e:
         logging.error(f"服务启动失败: {e}")

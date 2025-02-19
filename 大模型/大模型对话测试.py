@@ -1,7 +1,7 @@
 import requests
 
 # 服务端的 URL
-url = "http://localhost:8000/generate"
+url = "http://56.20.129.177:8012/generate"
 
 # 与模型交互的主循环
 while True:
